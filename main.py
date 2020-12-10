@@ -13,6 +13,7 @@ def get_response_with_book_data(book_id):
     response = requests.get(f'{INFO_URL}{book_id}/',
                             allow_redirects=False, verify=False)
     response.raise_for_status()
+
     return response
 
 
@@ -40,12 +41,19 @@ def parse_title_and_author(book_data):
     title = title_and_author[0].strip()
     author = title_and_author[1].strip()
 
+    if type(title_and_author) == None:
+        pass
+
     return sanitize_filename(title), sanitize_filename(author)
 
 
 def main():
     for book_id in range(1, 11):
         book_data = get_response_with_book_data(book_id)
+
+        if book_data.status_code == 302:
+            print(f'Книга с ID {book_id} не скачена')
+            continue
 
         title, author = parse_title_and_author(book_data)
 
