@@ -1,17 +1,20 @@
 import requests
+import json
 
 from bs4 import BeautifulSoup
 from pathlib import Path
 from pathvalidate import sanitize_filename
 from urllib.parse import urljoin
 
+from parse_tululu_category import parse_category
+
 
 DOWNLOAD_URL = 'https://tululu.org/txt.php?id='
 INFO_URL = 'https://tululu.org/b'
 
 
-def get_response(book_id):
-    response = requests.get(f'{INFO_URL}{book_id}/',
+def get_book_info(url, book_id):
+    response = requests.get(f'{url}{book_id}',
                             allow_redirects=False, verify=False)
     response.raise_for_status()
 
@@ -52,6 +55,34 @@ def download_img(book_data, folder='images/'):
     return str(path_to_save)
 
 
+def download_book():
+    books = []
+    book_ids = parse_category()
+
+    for book_id in book_ids:
+        book_data = get_book_info(INFO_URL, book_id)
+
+        title, author = parse_title_and_author(book_data)
+
+        book = {
+            'title': title,
+            'author': author,
+            'img_path': download_img(book_data),
+            'book_path': download_txt(book_id, title),
+            'comments': parse_comments(book_data),
+            'genre': parse_genres(book_data)
+        }
+
+        books.append(book)
+
+    return books
+
+
+def create_json(filename, obj):
+    with open(filename, 'w') as file:
+        json.dump(obj, file, ensure_ascii=False).encode('utf8')
+
+
 def parse_genres(book_data):
     soup = BeautifulSoup(book_data.text, 'lxml')
     genres = [genre.find('a').text for genre in soup.find_all(
@@ -87,19 +118,8 @@ def parse_title_and_author(book_data):
 
 
 def main():
-    for book_id in range(1, 11):
-        book_data = get_response(book_id)
-
-        if book_data.status_code == 302:
-            print(f'Книги с ID {book_id} нет')
-            continue
-
-        title, author = parse_title_and_author(book_data)
-
-        book_name = f'{book_id}. {title}'
-        #download_books = download_txt(book_id, book_name)
-        #download_images = download_img(book_data)
-        print(parse_genres(book_data))
+    books = download_book()
+    create_json('books.json', books)
 
 
 if __name__ == '__main__':
