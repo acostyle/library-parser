@@ -24,8 +24,8 @@ def parse_category(start_page=1, end_page=None):
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, 'lxml')
-        books_cards = [book.find('a')['href'][2:]
-                       for book in soup.find_all('table', class_='d_book')]
+        books_cards = [book.select_one('a')['href'][2:]
+                       for book in soup.select('div.bookimage')]
 
         book_ids += books_cards
 

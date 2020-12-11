@@ -1,5 +1,6 @@
 import requests
 import json
+import urllib3
 
 from bs4 import BeautifulSoup
 from pathlib import Path
@@ -85,23 +86,22 @@ def create_json(filename, obj):
 
 def parse_genres(book_data):
     soup = BeautifulSoup(book_data.text, 'lxml')
-    genres = [genre.find('a').text for genre in soup.find_all(
-        'span', class_='d_book')]
+    genre = soup.select_one('span.d_book a').text
 
-    return genres
+    return genre
 
 
 def parse_comments(book_data):
     soup = BeautifulSoup(book_data.text, 'lxml')
-    comments = [comment.find(
-        'span', class_='black').text for comment in soup.find_all('div', class_='texts')]
+    comments = [comment.select_one(
+        'span.black').text for comment in soup.select('div.texts')]
 
     return comments
 
 
 def parse_img(book_data):
     soup = BeautifulSoup(book_data.text, 'lxml')
-    image_link = soup.find('div', class_='bookimage').find('img')['src']
+    image_link = soup.select_one('div.bookimage img')['src']
 
     return urljoin(INFO_URL, image_link)
 
@@ -109,7 +109,7 @@ def parse_img(book_data):
 def parse_title_and_author(book_data):
     soup = BeautifulSoup(book_data.text, 'lxml')
 
-    title_and_author = soup.find('h1').text.split('\xa0 :: \xa0')
+    title_and_author = soup.select_one('h1').text.split('\xa0 :: \xa0')
 
     title = title_and_author[0].strip()
     author = title_and_author[1].strip()
