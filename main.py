@@ -1,14 +1,13 @@
 import argparse
 import requests
 import json
-import urllib3
 
 from bs4 import BeautifulSoup
 from pathlib import Path
 from pathvalidate import sanitize_filename
 from urllib.parse import urljoin
 
-from exception import raise_redirect_case
+from exceptions import redirect_case
 from parse_tululu_category import parse_category
 
 
@@ -20,47 +19,43 @@ def get_book_info(url, book_id):
     response = requests.get(f'{url}{book_id}',
                             allow_redirects=False, verify=False)
     response.raise_for_status()
-    raise_if_redirect(response)
+    redirect_case(response)
 
     return response
 
 
-def download_txt(book_id, filename, folder=f'books/'):
-    Path(folder).mkdir(parents=True, exist_ok=True)
-
+def download_txt(book_id, filename, folder):
     url = f'{DOWNLOAD_URL}{book_id}'
 
     response = requests.get(url, allow_redirects=False, verify=False)
     response.raise_for_status()
 
-    raise_if_redirect(response)
-
-    path_to_save = Path(folder).joinpath(f'{filename}.txt')
+    path_to_save_txt = Path('books').joinpath(f'{filename}.txt')
+    path_to_save = Path(folder).joinpath(path_to_save_txt)
 
     with open(path_to_save, 'wb') as file:
         file.write(response.content)
 
-    return str(path_to_save)
+    return str(path_to_save_txt)
 
 
-def download_img(book_data, folder=f'images/'):
-    Path(folder).mkdir(parents=True, exist_ok=True)
-
+def download_img(book_data, folder):
     image_url = parse_img(book_data)
 
     response = requests.get(image_url, allow_redirects=False, verify=False)
     response.raise_for_status()
 
-    raise_if_redirect(response)
+    redirect_case(response)
 
     filename = sanitize_filename(image_url.split('/')[-1])
 
-    path_to_save = Path(folder).joinpath(f'{filename}')
+    path_to_save_img = Path('images').joinpath(f'{filename}')
+    path_to_save = Path(folder).joinpath(path_to_save_img)
 
     with open(path_to_save, 'wb') as image:
         image.write(response.content)
 
-    return str(path_to_save)
+    return str(path_to_save_img)
 
 
 def download_book(start_page, end_page, book_data, title, author, download_images, download_texts):
@@ -126,9 +121,9 @@ def create_argparse():
     parser.add_argument('-df', '--dest_folder', default=Path.cwd(),
                         help='The path to the directory with the parsing results', type=str)
     parser.add_argument('-si', '--skip_imgs',
-                        help='Don\'t download pictures', action="store_true", type=str)
+                        help='Don\'t download pictures', action="store_true")
     parser.add_argument('-st', '--skip_txts',
-                        help='Don\'t download books', action="store_true", type=str)
+                        help='Don\'t download books', action="store_true")
     parser.add_argument(
         '-jn', '--json_name', default='books.json', help='Specify your *.json filename', type=str)
     args = parser.parse_args()
@@ -139,6 +134,9 @@ def create_argparse():
 def main():
     parser = create_argparse()
     args = parser.parse_args()
+
+    Path(args.dest_folder, 'images').mkdir(parents=True, exist_ok=True)
+    Path(args.dest_folder, 'books').mkdir(parents=True, exist_ok=True)
 
     if all([
         args.start_page < args.end_page,
@@ -157,27 +155,24 @@ def main():
                 if args.skip_txts:
                     download_texts = None
                 else:
-                    download_texts = download_txt(book_id, title)
+                    download_texts = download_txt(
+                        book_id, title, args.dest_folder)
 
                 if args.skip_imgs:
                     download_images = None
                 else:
-                    download_images = download_img(book_data)
+                    download_images = download_img(book_data, args.dest_folder)
 
                 book_info = download_book(
                     args.start_page, args.end_page, book_data, title, author, download_images, download_texts)
 
                 all_books.append(book_info)
-                break
 
             except requests.exceptions.ConnectionError:
                 print('ConnectionError')
 
-            except requests.HTTPError:
-                print('Page not found. Program will skip this page)
-                break
-
-        create_json(args.json_name, all_books)
+        filename = Path(args.dest_folder).joinpath(args.json_name)
+        create_json(filename, all_books)
     else:
         print('Incorrect start_page and end_page properties')
 
