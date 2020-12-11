@@ -52,10 +52,18 @@ def download_img(book_data, folder='images/'):
     return str(path_to_save)
 
 
+def parse_genres(book_data):
+    soup = BeautifulSoup(book_data.text, 'lxml')
+    genres = [genre.find('a').text for genre in soup.find_all(
+        'span', class_='d_book')]
+
+    return genres
+
+
 def parse_comments(book_data):
     soup = BeautifulSoup(book_data.text, 'lxml')
-    comments = [comment.select_one(
-        'span.black').text for comment in soup.find_all('div', class_='texts')]
+    comments = [comment.find(
+        'span', class_='black').text for comment in soup.find_all('div', class_='texts')]
 
     return comments
 
@@ -91,7 +99,7 @@ def main():
         book_name = f'{book_id}. {title}'
         #download_books = download_txt(book_id, book_name)
         #download_images = download_img(book_data)
-        print(parse_comments(book_data))
+        print(parse_genres(book_data))
 
 
 if __name__ == '__main__':
