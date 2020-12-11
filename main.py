@@ -8,6 +8,7 @@ from pathlib import Path
 from pathvalidate import sanitize_filename
 from urllib.parse import urljoin
 
+from exception import raise_redirect_case
 from parse_tululu_category import parse_category
 
 
@@ -19,6 +20,7 @@ def get_book_info(url, book_id):
     response = requests.get(f'{url}{book_id}',
                             allow_redirects=False, verify=False)
     response.raise_for_status()
+    raise_if_redirect(response)
 
     return response
 
@@ -30,6 +32,8 @@ def download_txt(book_id, filename, folder=f'books/'):
 
     response = requests.get(url, allow_redirects=False, verify=False)
     response.raise_for_status()
+
+    raise_if_redirect(response)
 
     path_to_save = Path(folder).joinpath(f'{filename}.txt')
 
@@ -46,6 +50,8 @@ def download_img(book_data, folder=f'images/'):
 
     response = requests.get(image_url, allow_redirects=False, verify=False)
     response.raise_for_status()
+
+    raise_if_redirect(response)
 
     filename = sanitize_filename(image_url.split('/')[-1])
 
@@ -143,24 +149,33 @@ def main():
         book_ids = parse_category(args.start_page, args.end_page)
 
         for book_id in book_ids:
-            book_data = get_book_info(INFO_URL, book_id)
+            try:
+                book_data = get_book_info(INFO_URL, book_id)
 
-            title, author = parse_title_and_author(book_data)
+                title, author = parse_title_and_author(book_data)
 
-            if args.skip_txts:
-                download_texts = None
-            else:
-                download_texts = download_txt(book_id, title)
+                if args.skip_txts:
+                    download_texts = None
+                else:
+                    download_texts = download_txt(book_id, title)
 
-            if args.skip_imgs:
-                download_images = None
-            else:
-                download_images = download_img(book_data)
+                if args.skip_imgs:
+                    download_images = None
+                else:
+                    download_images = download_img(book_data)
 
-            book_info = download_book(
-                args.start_page, args.end_page, book_data, title, author, download_images, download_texts)
+                book_info = download_book(
+                    args.start_page, args.end_page, book_data, title, author, download_images, download_texts)
 
-            all_books.append(book_info)
+                all_books.append(book_info)
+                break
+
+            except requests.exceptions.ConnectionError:
+                print('ConnectionError')
+
+            except requests.HTTPError:
+                print('Page not found. Program will skip this page)
+                break
 
         create_json(args.json_name, all_books)
     else:

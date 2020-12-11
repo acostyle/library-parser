@@ -3,6 +3,8 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
+from exception import raise_redirect_case
+
 
 def parse_category(start_page=1, end_page=None):
     book_ids = []
@@ -12,6 +14,7 @@ def parse_category(start_page=1, end_page=None):
     response = requests.get(f'{url}{start_page}',
                             allow_redirects=False, verify=False)
     response.raise_for_status()
+    raise_redirect_case(response)
 
     if not end_page:
         soup = BeautifulSoup(response.text, 'lxml')
