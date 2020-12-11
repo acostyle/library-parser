@@ -52,6 +52,14 @@ def download_img(book_data, folder='images/'):
     return str(path_to_save)
 
 
+def parse_comments(book_data):
+    soup = BeautifulSoup(book_data.text, 'lxml')
+    comments = [comment.select_one(
+        'span.black').text for comment in soup.find_all('div', class_='texts')]
+
+    return comments
+
+
 def parse_img(book_data):
     soup = BeautifulSoup(book_data.text, 'lxml')
     image_link = soup.find('div', class_='bookimage').find('img')['src']
@@ -75,14 +83,15 @@ def main():
         book_data = get_response(book_id)
 
         if book_data.status_code == 302:
-            print(f'Книга с ID {book_id} невозможно скачать')
+            print(f'Книги с ID {book_id} нет')
             continue
 
         title, author = parse_title_and_author(book_data)
 
         book_name = f'{book_id}. {title}'
-        download_books = download_txt(book_id, book_name)
-        download_images = download_img(book_data)
+        #download_books = download_txt(book_id, book_name)
+        #download_images = download_img(book_data)
+        print(parse_comments(book_data))
 
 
 if __name__ == '__main__':
