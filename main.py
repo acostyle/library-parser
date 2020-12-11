@@ -120,11 +120,11 @@ def create_argparse():
     parser.add_argument('-df', '--dest_folder', default=Path.cwd(),
                         help='The path to the directory with the parsing results', type=str)
     parser.add_argument('-si', '--skip_imgs',
-                        help='Don\'t download pictures', action="store_true")
+                        help='Don\'t download pictures', action="store_true", type=str)
     parser.add_argument('-st', '--skip_txts',
-                        help='Don\'t download books', action="store_true")
+                        help='Don\'t download books', action="store_true", type=str)
     parser.add_argument(
-        '-jn', '--json_name', default='books.json', help='Specify your *.json filename')
+        '-jn', '--json_name', default='books.json', help='Specify your *.json filename', type=str)
     args = parser.parse_args()
 
     return parser
