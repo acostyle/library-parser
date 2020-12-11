@@ -1,3 +1,4 @@
+import argparse
 import requests
 import json
 import urllib3
@@ -22,7 +23,7 @@ def get_book_info(url, book_id):
     return response
 
 
-def download_txt(book_id, filename, folder='books/'):
+def download_txt(book_id, filename, folder=f'books/'):
     Path(folder).mkdir(parents=True, exist_ok=True)
 
     url = f'{DOWNLOAD_URL}{book_id}'
@@ -38,7 +39,7 @@ def download_txt(book_id, filename, folder='books/'):
     return str(path_to_save)
 
 
-def download_img(book_data, folder='images/'):
+def download_img(book_data, folder=f'images/'):
     Path(folder).mkdir(parents=True, exist_ok=True)
 
     image_url = parse_img(book_data)
@@ -56,32 +57,23 @@ def download_img(book_data, folder='images/'):
     return str(path_to_save)
 
 
-def download_book():
-    books = []
-    book_ids = parse_category()
+def download_book(start_page, end_page, book_data, title, author, download_images, download_texts):
 
-    for book_id in book_ids:
-        book_data = get_book_info(INFO_URL, book_id)
+    book_info = {
+        'title': title,
+        'author': author,
+        'img_path': download_images,
+        'book_path': download_texts,
+        'comments': parse_comments(book_data),
+        'genre': parse_genres(book_data)
+    }
 
-        title, author = parse_title_and_author(book_data)
-
-        book = {
-            'title': title,
-            'author': author,
-            'img_path': download_img(book_data),
-            'book_path': download_txt(book_id, title),
-            'comments': parse_comments(book_data),
-            'genre': parse_genres(book_data)
-        }
-
-        books.append(book)
-
-    return books
+    return book_info
 
 
 def create_json(filename, obj):
-    with open(filename, 'w') as file:
-        json.dump(obj, file, ensure_ascii=False).encode('utf8')
+    with open(filename, 'w', encoding='utf-8') as file:
+        json.dump(obj, file, ensure_ascii=False)
 
 
 def parse_genres(book_data):
@@ -117,9 +109,62 @@ def parse_title_and_author(book_data):
     return sanitize_filename(title), sanitize_filename(author)
 
 
+def create_argparse():
+    parser = argparse.ArgumentParser(
+        description='Download book from tululu.org')
+
+    parser.add_argument(
+        '-sp', '--start_page', help='Which page to start downloading from', default=1, type=int)
+    parser.add_argument('-ep', '--end_page',
+                        help='To which page to start downloading', type=int)
+    parser.add_argument('-df', '--dest_folder', default=Path.cwd(),
+                        help='The path to the directory with the parsing results', type=str)
+    parser.add_argument('-si', '--skip_imgs',
+                        help='Don\'t download pictures', action="store_true")
+    parser.add_argument('-st', '--skip_txts',
+                        help='Don\'t download books', action="store_true")
+    parser.add_argument(
+        '-jn', '--json_name', default='books.json', help='Specify your *.json filename')
+    args = parser.parse_args()
+
+    return parser
+
+
 def main():
-    books = download_book()
-    create_json('books.json', books)
+    parser = create_argparse()
+    args = parser.parse_args()
+
+    if all([
+        args.start_page < args.end_page,
+        args.start_page > 0,
+        args.end_page > 0 if args.end_page else True
+    ]):
+        all_books = []
+        book_ids = parse_category(args.start_page, args.end_page)
+
+        for book_id in book_ids:
+            book_data = get_book_info(INFO_URL, book_id)
+
+            title, author = parse_title_and_author(book_data)
+
+            if args.skip_txts:
+                download_texts = None
+            else:
+                download_texts = download_txt(book_id, title)
+
+            if args.skip_imgs:
+                download_images = None
+            else:
+                download_images = download_img(book_data)
+
+            book_info = download_book(
+                args.start_page, args.end_page, book_data, title, author, download_images, download_texts)
+
+            all_books.append(book_info)
+
+        create_json(args.json_name, all_books)
+    else:
+        print('Incorrect start_page and end_page properties')
 
 
 if __name__ == '__main__':

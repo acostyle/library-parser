@@ -17,7 +17,7 @@ def parse_category(start_page=1, end_page=None):
         soup = BeautifulSoup(response.text, 'lxml')
         end_page = int(soup.select('a.npage')[-1].text)
 
-    for page in range(start_page, 1 + 1):
+    for page in range(start_page, end_page + 1):
 
         response = requests.get(
             f'{url}{page}', allow_redirects=False, verify=False)
