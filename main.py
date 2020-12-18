@@ -11,23 +11,23 @@ from exceptions import raise_if_redirect
 from parse_tululu_category import parse_category
 
 
-DOWNLOAD_URL = 'https://tululu.org/txt.php?id='
-INFO_URL = 'https://tululu.org/b'
+DOWNLOAD_URL = 'https://tululu.org/txt.php'
+INFO_URL = 'https://tululu.org'
 
 
-def get_book_info(url, book_id):
-    response = requests.get(f'{url}{book_id}',
-                            allow_redirects=False, verify=False)
+def get_book_info(book_url):
+    response = requests.get(book_url, allow_redirects=False, verify=False)
     response.raise_for_status()
     raise_if_redirect(response)
 
-    return response
+    return BeautifulSoup(response.text, 'lxml')
 
 
-def download_txt(book_id, filename, folder):
-    url = f'{DOWNLOAD_URL}{book_id}'
+def download_txt(book_url, filename, folder):
+    download_id = book_url[book_url.find('/b')+2:-1]
 
-    response = requests.get(url, allow_redirects=False, verify=False)
+    response = requests.get(DOWNLOAD_URL, params={
+                            "id": download_id, }, verify=False)
     response.raise_for_status()
     raise_if_redirect(response)
 
@@ -40,8 +40,8 @@ def download_txt(book_id, filename, folder):
     return str(path_to_save_txt)
 
 
-def download_img(book_data, folder):
-    image_url = parse_img(book_data)
+def download_img(book_data, book_url, folder):
+    image_url = parse_img(book_data, book_url)
 
     response = requests.get(image_url, allow_redirects=False, verify=False)
     response.raise_for_status()
@@ -78,36 +78,28 @@ def create_json(filename, obj):
 
 
 def parse_genres(book_data):
-    soup = BeautifulSoup(book_data.text, 'lxml')
-    genre = soup.select_one('span.d_book a').text
-
-    return genre
+    soup = book_data.select('span.d_book a')
+    genres = [genres.text for genres in soup]
+    return genres
 
 
 def parse_comments(book_data):
-    soup = BeautifulSoup(book_data.text, 'lxml')
-    comments = [comment.select_one(
-        'span.black').text for comment in soup.select('div.texts')]
-
+    title_tag = book_data.select("div.texts span.black")
+    comments = [comment.text for comment in title_tag]
     return comments
 
 
-def parse_img(book_data):
-    soup = BeautifulSoup(book_data.text, 'lxml')
-    image_link = soup.select_one('div.bookimage img')['src']
-
-    return urljoin(INFO_URL, image_link)
+def parse_img(book_data, book_url):
+    img_src = book_data.select_one('div.bookimage img')['src']
+    return urljoin(book_url, img_src)
 
 
 def parse_title_and_author(book_data):
-    soup = BeautifulSoup(book_data.text, 'lxml')
+    header = book_data.select_one("#content")
+    title_tag = header.h1
+    author, title = title_tag.text.split(' \xa0 :: \xa0 ')
 
-    title_and_author = soup.select_one('h1').text.split('\xa0 :: \xa0')
-
-    title = title_and_author[0].strip()
-    author = title_and_author[1].strip()
-
-    return sanitize_filename(title), sanitize_filename(author)
+    return sanitize_filename(author), sanitize_filename(title)
 
 
 def create_argparser():
@@ -127,52 +119,53 @@ def create_argparser():
     parser.add_argument(
         '-jn', '--json_name', default='books.json', help='Specify your *.json filename', type=str)
 
+    args = parser.parse_args()
+
+    if not (args.start_page < args.end_page and
+            args.start_page > 0 and
+            args.end_page > 0):
+        print('Incorrect start_page or end_page arguments')
+
     return parser
 
 
 def main():
-    parser = create_argparse()
+    parser = create_argparser()
     args = parser.parse_args()
 
     Path(args.dest_folder, 'images').mkdir(parents=True, exist_ok=True)
     Path(args.dest_folder, 'books').mkdir(parents=True, exist_ok=True)
 
-    if all([
-        args.start_page < args.end_page,
-        args.start_page > 0,
-        args.end_page > 0 if args.end_page else True
-    ]):
-        all_books = []
-        book_ids = parse_category(args.start_page, args.end_page)
+    all_books = []
+    book_urls = parse_category(args.start_page, args.end_page)
 
-        for book_id in book_ids:
-            try:
-                book_data = get_book_info(INFO_URL, book_id)
+    for book_url in book_urls:
+        try:
+            book_data = get_book_info(book_url)
+            title, author = parse_title_and_author(book_data)
 
-                title, author = parse_title_and_author(book_data)
+            download_texts = None
+            if not args.skip_txts:
+                download_texts = download_txt(
+                    book_url, title, args.dest_folder)
 
-                download_texts = None
-                if not args.skip_txts:
-                    download_texts = download_txt(
-                        book_id, title, args.dest_folder)
+            download_images = None
+            if not args.skip_imgs:
+                download_images = download_img(
+                    book_data, book_url, args.dest_folder)
 
-                download_images = None
-                if not args.skip_imgs:
-                    download_images = download_img(book_data, args.dest_folder)
+            book_info = download_book(
+                args.start_page, args.end_page, book_data, title, author, download_images, download_texts)
 
-                book_info = download_book(
-                    args.start_page, args.end_page, book_data, title, author, download_images, download_texts)
+            all_books.append(book_info)
 
-                all_books.append(book_info)
+        except requests.exceptions.ConnectionError:
+            print('ConnectionError')
 
-            except requests.exceptions.ConnectionError:
-                print('ConnectionError')
+    filename = Path(args.dest_folder).joinpath(args.json_name)
+    create_json(filename, all_books)
 
-        filename = Path(args.dest_folder).joinpath(args.json_name)
-        create_json(filename, all_books)
-
-    else:
-        print('Incorrect start_page and end_page properties')
+    print('DONE!')
 
 
 if __name__ == '__main__':
