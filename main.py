@@ -7,7 +7,7 @@ from pathlib import Path
 from pathvalidate import sanitize_filename
 from urllib.parse import urljoin
 
-from exceptions import redirect_case
+from exceptions import raise_if_redirect
 from parse_tululu_category import parse_category
 
 
@@ -19,7 +19,7 @@ def get_book_info(url, book_id):
     response = requests.get(f'{url}{book_id}',
                             allow_redirects=False, verify=False)
     response.raise_for_status()
-    redirect_case(response)
+    raise_if_redirect(response)
 
     return response
 
@@ -29,6 +29,7 @@ def download_txt(book_id, filename, folder):
 
     response = requests.get(url, allow_redirects=False, verify=False)
     response.raise_for_status()
+    raise_if_redirect(response)
 
     path_to_save_txt = Path('books').joinpath(f'{filename}.txt')
     path_to_save = Path(folder).joinpath(path_to_save_txt)
@@ -44,8 +45,7 @@ def download_img(book_data, folder):
 
     response = requests.get(image_url, allow_redirects=False, verify=False)
     response.raise_for_status()
-
-    redirect_case(response)
+    raise_if_redirect(response)
 
     filename = sanitize_filename(image_url.split('/')[-1])
 
@@ -110,7 +110,7 @@ def parse_title_and_author(book_data):
     return sanitize_filename(title), sanitize_filename(author)
 
 
-def create_argparse():
+def create_argparser():
     parser = argparse.ArgumentParser(
         description='Download book from tululu.org')
 
@@ -126,7 +126,6 @@ def create_argparse():
                         help='Don\'t download books', action="store_true")
     parser.add_argument(
         '-jn', '--json_name', default='books.json', help='Specify your *.json filename', type=str)
-    args = parser.parse_args()
 
     return parser
 
@@ -152,15 +151,13 @@ def main():
 
                 title, author = parse_title_and_author(book_data)
 
-                if args.skip_txts:
-                    download_texts = None
-                else:
+                download_texts = None
+                if not args.skip_txts:
                     download_texts = download_txt(
                         book_id, title, args.dest_folder)
 
-                if args.skip_imgs:
-                    download_images = None
-                else:
+                download_images = None
+                if not args.skip_imgs:
                     download_images = download_img(book_data, args.dest_folder)
 
                 book_info = download_book(
@@ -173,6 +170,7 @@ def main():
 
         filename = Path(args.dest_folder).joinpath(args.json_name)
         create_json(filename, all_books)
+
     else:
         print('Incorrect start_page and end_page properties')
 

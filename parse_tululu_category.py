@@ -3,7 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
-from exceptions import redirect_case
+from exceptions import raise_if_redirect
 
 
 def parse_category(start_page=1, end_page=None):
@@ -14,7 +14,7 @@ def parse_category(start_page=1, end_page=None):
     response = requests.get(f'{url}{start_page}',
                             allow_redirects=False, verify=False)
     response.raise_for_status()
-    redirect_case(response)
+    raise_if_redirect(response)
 
     if not end_page:
         soup = BeautifulSoup(response.text, 'lxml')
@@ -25,6 +25,7 @@ def parse_category(start_page=1, end_page=None):
         response = requests.get(
             f'{url}{page}', allow_redirects=False, verify=False)
         response.raise_for_status()
+        raise_if_redirect(response)
 
         soup = BeautifulSoup(response.text, 'lxml')
         books_cards = [book.select_one('a')['href'][2:]
