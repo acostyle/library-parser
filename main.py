@@ -11,10 +11,6 @@ from exceptions import raise_if_redirect
 from parse_tululu_category import parse_category
 
 
-DOWNLOAD_URL = 'https://tululu.org/txt.php'
-INFO_URL = 'https://tululu.org'
-
-
 def get_book_info(book_url):
     response = requests.get(book_url, allow_redirects=False, verify=False)
     response.raise_for_status()
@@ -26,7 +22,7 @@ def get_book_info(book_url):
 def download_txt(book_url, filename, folder):
     download_id = book_url[book_url.find('/b')+2:-1]
 
-    response = requests.get(DOWNLOAD_URL, params={
+    response = requests.get('https://tululu.org/txt.php', params={
                             "id": download_id, }, verify=False)
     response.raise_for_status()
     raise_if_redirect(response)
