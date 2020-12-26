@@ -1,10 +1,12 @@
 import argparse
 import requests
 import json
+import urllib3
 
 from bs4 import BeautifulSoup
 from pathlib import Path
 from pathvalidate import sanitize_filename
+from tqdm import tqdm
 from urllib.parse import urljoin
 
 from exceptions import raise_if_redirect
@@ -126,6 +128,8 @@ def create_argparser():
 
 
 def main():
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
     parser = create_argparser()
     args = parser.parse_args()
 
@@ -135,7 +139,7 @@ def main():
     all_books = []
     book_urls = parse_category(args.start_page, args.end_page)
 
-    for book_url in book_urls:
+    for book_url in tqdm(book_urls, desc='Progress:'):
         try:
             book_data = get_book_info(book_url)
             title, author = parse_title_and_author(book_data)
