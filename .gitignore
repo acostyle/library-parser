@@ -132,5 +132,5 @@ dmypy.json
 .pyre/
 
 # Another files
-about_books.json
+*.json
 
